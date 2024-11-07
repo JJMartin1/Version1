@@ -1,0 +1,118 @@
+import random
+
+#1: Initializing the Battleship game
+class Battleship:
+  # following original rules: 5 total ships: carrier-5, battleship-4, cruiser-3, submarine-3, destroyer-2
+  def __init__(self, size=10):
+      self.size = size
+      self.board = [[' ']*size for _ in range(size)]
+      self.ships = {'Carrier': 5, 'Battleship': 4, 'Cruiser': 3, 'Submarine': 3, 'Destroyer': 2}
+      self.enemy_board = [[' ']*size for _ in range(size)]
+      self.place_ships()
+      # using probability map for agent's reinforcement learning method for improved guessing 
+      self.probability_map = [[0] * size for _ in range(size)]
+
+  #2: Place the ships
+  # function will iterate over each ship type and size, randomly placing it either horizontally or vertically on the board.
+  def place_ships(self):
+      for ship, size in self.ships.items():
+          placed = False
+          while not placed:
+              orientation = random.choice(['horizontal', 'vertical'])
+              if orientation == 'horizontal':
+                  row = random.randint(0, self.size - 1)
+                  col = random.randint(0, self.size - size)
+                  if all(self.board[row][col + i] == ' ' for i in range(size)):
+                      for i in range(size):
+                          self.board[row][col + i] = 'S'
+                      placed = True
+              else:
+                  row = random.randint(0, self.size - size)
+                  col = random.randint(0, self.size - 1)
+                  if all(self.board[row + i][col] == ' ' for i in range(size)):
+                      for i in range(size):
+                          self.board[row + i][col] = 'S'
+                      placed = True
+
+  #3: Print the board
+  # following original rules 8x8 grid board
+  def print_board(self, board, show_ships=False):
+      print("   " + " ".join(str(i).rjust(2) for i in range(self.size)))  # Column headers: numbers 0-7
+      for idx, row in enumerate(board):
+        line = []
+        for i in range(self.size):
+          if board[idx][i] == 'S' and show_ships:
+            line.append('S')
+          elif board[idx][i] == 'H':
+            line.append('H')
+          elif board[idx][i] == 'M':
+            line.append('M')
+          else:
+            line.append(' ')
+          print(chr(65 + idx).rjust(2) + " " + " ".join(item.rjust(2) for item in line))  # Row labels: letters A-H
+
+  #4: Make a guess
+  # this function will receive coordinations for a guess and check if the ship is present at that location on the board
+  # then it updates the enemy baord accordingly, marking hits and misses and also updating the probability map
+  def make_guess(self, row, col):
+      if self.board[row][col] == 'S':
+            self.enemy_board[row][col] = 'H'
+            self.update_probability_map(row, col, hit=True)
+            return True
+      else:
+            self.enemy_board[row][col] = 'M'
+            self.update_probability_map(row, col, hit=False)
+            return False
+
+  #5: Update the probability map around hits to prioritize nearby cells
+  def update_probability_map(self, row, col, hit):
+    directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+    if hit:
+      for dr, dc in directions:
+        nr, nc = row + dr, col + dc
+        if 0 <= nr < self.size and 0 <= nc < self.size and self.enemy_board[nr][nc] == ' ':
+          self.probability_map[nr][nc] += 1  # Increase priority around a hit
+
+
+  #6: agent for improved guessing
+  def ai_guess(self):
+    # Get the highest probability cell that hasn't been guessed yet
+    max_prob = -1
+    best_guess = None
+    for r in range(self.size):
+      for c in range(self.size):
+        if self.enemy_board[r][c] == ' ' and self.probability_map[r][c] > max_prob:
+          max_prob = self.probability_map[r][c]
+          best_guess = (r, c)
+
+    # If no high-probability cell is found, make a random guess
+    if best_guess:
+      return best_guess
+    else:
+      while True:
+        row, col = random.randint(0, self.size - 1), random.randint(0, self.size - 1)
+        if self.enemy_board[row][col] == ' ':
+          return row, col
+
+  #7: Play the game with reinforcement-based AI
+  def play_game(self):
+    game_over = False
+    while not game_over:
+      row, col = self.ai_guess()
+      if self.make_guess(row, col):
+        print(f"Hit at {chr(65 + row)}, {col}")  # Print with row as letter (A-H) and column as number (0-7)
+      else:
+        print(f"Miss at {chr(65 + row)}, {col}")
+      self.print_board(self.enemy_board)
+      # Check if all ships are hit (game over condition)
+      if all(self.enemy_board[r][c] == 'H' for r in range(self.size) for c in range(self.size) if self.board[r][c] == 'S'):
+        game_over = True
+        print("Game over, all ships sunk!")
+
+#testing out the game
+game = Battleship()
+
+print("iniital ship placement on the board:")
+game.print_board(game.board, show_ships=True)
+
+game.play_game()
